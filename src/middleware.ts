@@ -25,13 +25,18 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
+  // Definimos qué rutas son públicas (puedes entrar sin estar logueado)
+  const isPublicRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup')
+
+  // Si no hay usuario y NO está en una ruta pública, lo mandamos al login
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
+  // Si ya hay usuario y quiere entrar a login o signup, lo mandamos directo a la app (Dashboard)
+  if (user && isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
