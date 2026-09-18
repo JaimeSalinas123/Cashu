@@ -5,7 +5,9 @@ import { cookies } from 'next/headers'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  
+  // Hacia dónde lo mandamos después de verificar el código
+  const next = searchParams.get('next') ?? '/'
+
   if (code) {
     const cookieStore = await cookies()
     const supabase = createServerClient(
@@ -15,21 +17,18 @@ export async function GET(request: Request) {
         cookies: {
           getAll() { return cookieStore.getAll() },
           setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-            } catch (error) {}
+            try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } catch {}
           },
         },
       }
     )
     
-    // Intercambiamos el código de Google por una sesión en tu base de datos
+    // Intercambiamos el código por una sesión temporal
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}/`)
+      return NextResponse.redirect(`${origin}${next}`)
     }
   }
 
-  // Si algo falla, lo devolvemos al login
-  return NextResponse.redirect(`${origin}/login?error=google-auth-fallo`)
+  return NextResponse.redirect(`${origin}/login?error=enlace-invalido`)
 }

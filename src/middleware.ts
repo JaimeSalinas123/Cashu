@@ -25,18 +25,24 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Definimos qué rutas son públicas (puedes entrar sin estar logueado)
-  const isPublicRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup')
+  // 1. Definimos TODAS las rutas públicas (donde puedes entrar sin cuenta)
+  const publicRoutes = ['/login', '/signup', '/forgot-password', '/update-password', '/auth/callback']
+  
+  // Verificamos si la ruta actual es una de las públicas
+  const isPublicRoute = publicRoutes.some(route => request.nextUrl.pathname.startsWith(route))
 
-  // Si no hay usuario y NO está en una ruta pública, lo mandamos al login
+  // 2. Si NO hay usuario y la ruta NO es pública -> pa' fuera (al login)
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Si ya hay usuario y quiere entrar a login o signup, lo mandamos directo a la app (Dashboard)
-  if (user && isPublicRoute) {
+  // 3. Si YA hay usuario y quiere entrar a login o signup -> directo al Dashboard
+  // (Nota: excluimos update-password de aquí, porque cuando reseteas la contraseña, Supabase te loguea temporalmente)
+  const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup')
+  
+  if (user && isAuthRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)

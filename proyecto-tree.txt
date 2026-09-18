@@ -1,0 +1,31 @@
+﻿Cashu
++---public
+|   \---logo.png
++---src
+|   +---app
+|   |   +---login
+|   |   |   +---actions.ts
+|   |   |   \---page.tsx
+|   |   +---signup
+|   |   |   \---page.tsx
+|   |   +---favicon.ico
+|   |   +---globals.css
+|   |   +---layout.tsx
+|   |   \---page.tsx
+|   +---lib
+|   |   \---supabase
+|   |       \---server.ts
+|   \---middleware.ts
++---.env
++---.gitignore
++---AGENTS.md
++---CLAUDE.md
++---eslint.config.mjs
++---next.config.ts
++---next-env.d.ts
++---package.json
++---package-lock.json
++---postcss.config.mjs
++---proyecto-tree.txt
++---README.md
+\---tsconfig.json
