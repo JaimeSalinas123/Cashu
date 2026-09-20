@@ -21,7 +21,6 @@ const AVAILABLE_WIDGETS = [
   { id: 'agenda', title: 'Agenda', icon: Icons.Agenda },
   { id: 'contadorcalorias', title: 'Calorías', icon: Icons.Calorias },
   { id: 'calendario', title: 'Calendario', icon: Icons.Calendario },
-  { id: 'recordatorios', title: 'Recordatorios', icon: Icons.Recordatorios },
 ]
 
 export default function DashboardPage() {
