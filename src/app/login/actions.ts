@@ -2,30 +2,36 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { createClient } from '../../lib/supabase/server'
+import { createClient } from '../../lib/supabase/server' // Ojo: Si este archivo está en src/app/actions.ts, cámbialo a '../lib/supabase/server'
 import { z } from 'zod'
 
-/// 🛡️ ESQUEMAS DE SEGURIDAD (ZOD)
+// ==========================================
+// 🛡️ ESQUEMAS DE SEGURIDAD (ZOD)
+// ==========================================
+
 const loginSchema = z.object({
   email: z.string().email().trim().toLowerCase().max(255),
   password: z.string().min(1).max(100),
 })
 
 const signupSchema = z.object({
-  // Relajamos un poco el username temporalmente
   username: z.string().trim().min(3).max(50), 
   email: z.string().email().trim().toLowerCase().max(255),
-  password: z.string().min(6).max(100), // Bajamos a 6 para probar
+  password: z.string().min(6).max(100),
   confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Las contraseñas no coinciden",
   path: ["confirmPassword"],
 })
 
+// ==========================================
+// 🔐 AUTENTICACIÓN (Login, Registro, Recuperación)
+// ==========================================
+
 export async function login(formData: FormData) {
   const supabase = await createClient()
   
-  // 1. Validar y limpiar lo que envió el cliente (Evita inyección de campos)
+  // 1. Validar y limpiar lo que envió el cliente
   const parsed = loginSchema.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
@@ -38,7 +44,7 @@ export async function login(formData: FormData) {
 
   const { error } = await supabase.auth.signInWithPassword({ email, password })
   
-  // 2. Mensaje genérico: No decimos si el correo existe o si fue la contraseña
+  // 2. Mensaje genérico por seguridad
   if (error) redirect('/login?error=credenciales-invalidas')
 
   revalidatePath('/', 'layout')
@@ -71,7 +77,6 @@ export async function signup(formData: FormData) {
     }
   })
   
-  // Si el correo ya existe, Supabase devuelve error, pero nosotros damos un mensaje genérico
   if (error) redirect('/signup?error=no-se-pudo-crear-cuenta')
 
   revalidatePath('/', 'layout')
@@ -83,13 +88,12 @@ export async function resetPassword(formData: FormData) {
   const email = formData.get('email') as string
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    // Cuando hagan clic en el correo, los mandamos a nuestra ruta secreta y de ahí a cambiar la contraseña
+    // Ruta secreta de callback
     redirectTo: `http://localhost:3000/auth/callback?next=/update-password`,
   })
 
   if (error) redirect('/forgot-password?error=hubo-un-problema')
   
-  // Si todo sale bien, lo dejamos en la misma página pero le mostramos un aviso de éxito
   redirect('/forgot-password?success=correo-enviado')
 }
 
@@ -97,10 +101,53 @@ export async function updatePassword(formData: FormData) {
   const supabase = await createClient()
   const password = formData.get('password') as string
 
-  // Actualizamos la contraseña del usuario que está logueado temporalmente por el enlace
+  // Actualizamos la contraseña del usuario logueado temporalmente
   const { error } = await supabase.auth.updateUser({ password })
 
   if (error) redirect('/update-password?error=no-se-pudo-actualizar')
   
   redirect('/login?success=contrasena-actualizada')
+}
+
+// ==========================================
+// 🎛️ DASHBOARD Y PREFERENCIAS DE USUARIO
+// ==========================================
+
+export async function logout() {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  redirect('/login')
+}
+
+// Lee los módulos que el usuario guardó en su perfil
+export async function getPreferences() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return []
+
+  const { data, error } = await supabase
+    .from('user_preferences')
+    .select('active_widgets')
+    .eq('user_id', user.id)
+    .single()
+
+  if (data) return data.active_widgets || []
+  return []
+}
+
+// Actualiza los módulos en la base de datos de forma silenciosa
+export async function updatePreferences(widgets: string[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return
+
+  // upsert: actualiza si existe, crea si no existe
+  await supabase
+    .from('user_preferences')
+    .upsert({ 
+      user_id: user.id, 
+      active_widgets: widgets 
+    }, { onConflict: 'user_id' })
 }

@@ -3,15 +3,25 @@
 |   \---logo.png
 +---src
 |   +---app
+|   |   +---actions.ts
+|   |   +---auth
+|   |   |   \---callback
+|   |   |       \---route.ts
+|   |   +---forgot-password
+|   |   |   \---page.tsx
 |   |   +---login
 |   |   |   +---actions.ts
 |   |   |   \---page.tsx
 |   |   +---signup
 |   |   |   \---page.tsx
+|   |   +---update-password
+|   |   |   \---page.tsx
 |   |   +---favicon.ico
 |   |   +---globals.css
 |   |   +---layout.tsx
 |   |   \---page.tsx
+|   +---components
+|   |   \---Toast.tsx
 |   +---lib
 |   |   \---supabase
 |   |       \---server.ts
