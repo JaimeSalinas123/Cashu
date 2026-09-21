@@ -52,6 +52,34 @@ export async function addFoodLog(formData: FormData) {
   return { success: true }
 }
 
+// NUEVO: Función para actualizar un alimento ya registrado
+export async function updateFoodLog(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No estás logueado' }
+
+  const id = formData.get('id') as string
+  const name = formData.get('name') as string
+  const calories = parseFloat(formData.get('calories') as string) || 0
+  const protein = parseFloat(formData.get('protein') as string) || 0
+  const carbs = parseFloat(formData.get('carbs') as string) || 0
+  const fat = parseFloat(formData.get('fat') as string) || 0
+  const meal_type = formData.get('meal_type') as string
+
+  if (!id) return { error: 'Faltan datos' }
+
+  const { error } = await supabase
+    .from('food_logs')
+    .update({ name, calories, protein, carbs, fat, meal_type })
+    .eq('id', id)
+    .eq('user_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/contadorcalorias')
+  return { success: true }
+}
+
 export async function deleteFoodLog(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -65,7 +93,6 @@ export async function deleteFoodLog(formData: FormData) {
   return { success: true }
 }
 
-// NUEVO: Para eliminar de "Mis Comidas"
 export async function deleteSavedFood(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

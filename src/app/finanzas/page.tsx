@@ -164,8 +164,8 @@ function getDeleteCopy({ kind, item }: DeleteTarget) {
     }
   }
   return {
-    title: item.type === 'ingreso' ? 'Eliminar ingreso mensual' : 'Eliminar gasto mensual',
-    text: `"${item.description}" dejará de aparecer en tus mensuales. Los movimientos que ya registraste se conservan.`,
+    title: item.type === 'ingreso' ? 'Eliminar registro recurrente' : 'Eliminar registro recurrente',
+    text: `"${item.description}" dejará de aparecer en tus recurrentes. Los movimientos que ya registraste se conservan.`,
   }
 }
 
@@ -362,10 +362,10 @@ function TransactionRow({
           <p className="truncate text-[15px] font-semibold text-[#16211B]">{t.description}</p>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#5B6B60]">
             <span>{t.date}</span>
-            {t.category === 'Mensual' && (
+            {(t.category === 'Mensual' || t.category === 'Semanal') && (
               <span className="inline-flex items-center gap-1 rounded-full bg-[#DCE8DF]/50 px-2 py-0.5 text-[11px] font-medium text-[#5B6B60]">
                 <Icon name="repeat" size={11} />
-                Mensual
+                {t.category}
               </span>
             )}
           </div>
@@ -403,6 +403,7 @@ function RecurringRow({
   onDelete: () => void
 }) {
   const isIncome = r.type === 'ingreso'
+  const isWeekly = r.frequency === 'semanal'
 
   return (
     <li className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-3 py-4 transition-colors hover:bg-[#F5F9F6] sm:gap-4 sm:px-4">
@@ -416,9 +417,12 @@ function RecurringRow({
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-semibold text-[#16211B]">{r.description}</p>
-          <p className="mt-0.5 text-xs text-[#5B6B60]">
-            Siguiente {isIncome ? 'cobro' : 'pago'}: <span className="tabular-nums font-medium">{formatShortDate(r.next_date)}</span>
-          </p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-[#5B6B60]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#DCE8DF]/50 px-2 py-0.5 text-[11px] font-medium text-[#5B6B60]">
+              {isWeekly ? 'Semanal' : 'Mensual'}
+            </span>
+            <span>Siguiente: <span className="tabular-nums font-medium">{formatShortDate(r.next_date)}</span></span>
+          </div>
         </div>
         <span
           className={`text-[15px] font-semibold tabular-nums sm:hidden ${isIncome ? 'text-[#3FA66C]' : 'text-red-500'}`}
@@ -481,7 +485,7 @@ function EmptyState({
 
 export default function FinanzasPage() {
   const [activeTab, setActiveTab] = useState<'resumen' | 'ingresos' | 'gastos' | 'metas'>('resumen')
-  const [subTab, setSubTab] = useState<'movimientos' | 'mensuales'>('movimientos')
+  const [subTab, setSubTab] = useState<'movimientos' | 'recurrentes'>('movimientos')
   const [isLoading, setIsLoading] = useState(true)
 
   const [baseBalance, setBaseBalance] = useState<number>(0)
@@ -499,6 +503,7 @@ export default function FinanzasPage() {
 
   const [transactionType, setTransactionType] = useState<'ingreso' | 'gasto'>('ingreso')
   const [recurringType, setRecurringType] = useState<'ingreso' | 'gasto'>('gasto')
+  const [formFrequency, setFormFrequency] = useState<'mensual' | 'semanal'>('mensual')
 
   const [editingTransaction, setEditingTransaction] = useState<any>(null)
   const [editingRecurring, setEditingRecurring] = useState<any>(null)
@@ -602,6 +607,7 @@ export default function FinanzasPage() {
   const openRecurringModal = (type: 'ingreso' | 'gasto', item: any = null) => {
     setRecurringType(type)
     setEditingRecurring(item)
+    setFormFrequency(item?.frequency || 'mensual')
     setIsRecurringModalOpen(true)
   }
   const closeRecurringModal = () => {
@@ -641,7 +647,7 @@ export default function FinanzasPage() {
     { id: 'resumen', label: 'Resumen', icon: 'list' },
     { id: 'ingresos', label: 'Ingresos', icon: 'up' },
     { id: 'gastos', label: 'Gastos', icon: 'down' },
-    { id: 'metas', label: 'Metas', icon: 'target' }, // Reduje a "Metas" para mejor ajuste móvil
+    { id: 'metas', label: 'Metas', icon: 'target' },
   ] as const
 
   if (isLoading) {
@@ -658,7 +664,6 @@ export default function FinanzasPage() {
   return (
     <div className={`min-h-screen bg-[#EAF1EC] text-[#16211B] antialiased ${manrope.className}`}>
       <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-10 md:py-12">
-        {/* ENCABEZADO */}
         <header className="mb-6 flex items-center gap-4">
           <Link
             href="/"
@@ -673,7 +678,6 @@ export default function FinanzasPage() {
           </div>
         </header>
 
-        {/* NAVEGACIÓN RESPONSIVE (ARREGLADA PARA MÓVIL) */}
         <div className="mb-8">
           <div
             role="tablist"
@@ -702,11 +706,9 @@ export default function FinanzasPage() {
           </div>
         </div>
 
-        {/* VISTA RESUMEN */}
         {activeTab === 'resumen' && (
           <div className="animate-in fade-in duration-300 motion-reduce:animate-none">
             <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
-              {/* Balance principal */}
               <section className="relative overflow-hidden rounded-[28px] bg-[#1F3D2C] p-6 text-white shadow-lg shadow-[#1F3D2C]/15 md:p-9 lg:col-span-2">
                 <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/5 blur-2xl" />
                 <div className="pointer-events-none absolute -bottom-24 right-10 h-56 w-56 rounded-full border border-white/5" />
@@ -759,7 +761,6 @@ export default function FinanzasPage() {
                 </div>
               </section>
 
-              {/* Ahorro en metas */}
               <section className="flex flex-col justify-between rounded-[28px] border border-[#DCE8DF] bg-white p-6 shadow-sm md:p-8">
                 <div>
                   <div className="flex items-center gap-3">
@@ -798,7 +799,6 @@ export default function FinanzasPage() {
               </section>
             </div>
 
-            {/* Movimientos */}
             <section className="rounded-[28px] border border-[#DCE8DF] bg-white p-4 shadow-sm sm:p-6">
               <div className="mb-2 flex flex-col sm:flex-row sm:items-baseline sm:justify-between px-2 sm:px-4 gap-2">
                 <h3 className="text-lg font-semibold tracking-tight">Todos los movimientos</h3>
@@ -841,7 +841,7 @@ export default function FinanzasPage() {
                     </>
                   ) : (
                     <>
-                      <span className="font-semibold tabular-nums text-[#16211B]">{money(recurringTotal)}</span> al mes,{' '}
+                      <span className="font-semibold tabular-nums text-[#16211B]">{money(recurringTotal)}</span> de forma periódica,{' '}
                       {activeRecurring.length} {activeRecurring.length === 1 ? 'registro' : 'registros'}
                     </>
                   )}
@@ -858,11 +858,10 @@ export default function FinanzasPage() {
                 <Icon name="plus" size={18} />
                 {subTab === 'movimientos'
                   ? `Nuevo ${activeType === 'ingreso' ? 'ingreso' : 'gasto'}`
-                  : `Colocar ${activeType === 'ingreso' ? 'ingreso' : 'gasto'} mensual`}
+                  : `Colocar ${activeType === 'ingreso' ? 'ingreso' : 'gasto'} recurrente`}
               </button>
             </div>
 
-            {/* Subsecciones Responsive */}
             <div className="mb-5">
               <div
                 role="tablist"
@@ -872,7 +871,7 @@ export default function FinanzasPage() {
                 {(
                   [
                     { id: 'movimientos', label: 'Movimientos', count: 0 },
-                    { id: 'mensuales', label: 'Mensuales', count: activeRecurring.length },
+                    { id: 'recurrentes', label: 'Recurrentes', count: activeRecurring.length },
                   ] as const
                 ).map((s) => {
                   const isActive = subTab === s.id
@@ -930,18 +929,18 @@ export default function FinanzasPage() {
                   </span>
                   <p className="leading-relaxed">
                     {activeType === 'ingreso'
-                      ? 'Cuando te paguen, presiona Registrar cobro y se agregará a tus ingresos con la fecha de hoy. La fecha de siguiente cobro avanza un mes.'
-                      : 'Cuando pagues, presiona Registrar pago y se agregará a tus gastos con la fecha de hoy. La fecha de siguiente pago avanza un mes.'}
+                      ? 'Cuando te paguen, presiona Registrar cobro y se agregará a tus ingresos con la fecha de hoy. La fecha se actualizará sumando 7 días o 1 mes según corresponda.'
+                      : 'Cuando pagues, presiona Registrar pago y se agregará a tus gastos con la fecha de hoy. La fecha se actualizará sumando 7 días o 1 mes según corresponda.'}
                   </p>
                 </div>
                 {activeRecurring.length === 0 ? (
                   <EmptyState
                     icon="repeat"
-                    title={`Sin ${activeType === 'ingreso' ? 'ingresos' : 'gastos'} mensuales`}
+                    title={`Sin ${activeType === 'ingreso' ? 'ingresos' : 'gastos'} recurrentes`}
                     text={
                       activeType === 'ingreso'
-                        ? 'Agrega tu salario u otros ingresos fijos y registra cada cobro con un botón.'
-                        : 'Agrega el alquiler, suscripciones y otros pagos fijos y registra cada pago con un botón.'
+                        ? 'Agrega tu salario u otros ingresos semanales o mensuales y regístralos con un botón.'
+                        : 'Agrega alquiler, suscripciones u otros pagos y regístralos con un botón.'
                     }
                     action={
                       <button
@@ -949,7 +948,7 @@ export default function FinanzasPage() {
                         className={`flex items-center gap-2 rounded-xl border border-[#DCE8DF] bg-[#F5F9F6] px-4 py-2.5 text-sm font-semibold text-[#1F3D2C] transition-colors hover:bg-[#DCE8DF] ${focusRing}`}
                       >
                         <Icon name="plus" size={16} />
-                        Colocar {activeType === 'ingreso' ? 'ingreso' : 'gasto'} mensual
+                        Colocar recurrente
                       </button>
                     }
                   />
@@ -1147,7 +1146,7 @@ export default function FinanzasPage() {
 
       {isRecurringModalOpen && (
         <Modal
-          title={`${editingRecurring ? 'Editar' : 'Colocar'} ${recurringType === 'ingreso' ? 'ingreso' : 'gasto'} mensual`}
+          title={`${editingRecurring ? 'Editar' : 'Colocar'} ${recurringType === 'ingreso' ? 'ingreso' : 'gasto'} recurrente`}
           description={
             recurringType === 'ingreso'
               ? 'Guarda un ingreso fijo. Cuando te paguen, presionas Registrar cobro.'
@@ -1157,8 +1156,30 @@ export default function FinanzasPage() {
           onClose={closeRecurringModal}
         >
           <input type="hidden" name="type" value={recurringType} />
+          <input type="hidden" name="frequency" value={formFrequency} />
           {editingRecurring && <input type="hidden" name="id" value={editingRecurring.id} />}
+          
           <div className="flex flex-col gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[#33443A] mb-1.5">Frecuencia</label>
+              <div className="flex bg-[#F5F9F6] p-1 rounded-xl shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => setFormFrequency('mensual')} 
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${formFrequency === 'mensual' ? 'bg-white shadow-sm text-[#16211B]' : 'text-[#5B6B60]'}`}
+                >
+                  Mensual
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setFormFrequency('semanal')} 
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${formFrequency === 'semanal' ? 'bg-white shadow-sm text-[#16211B]' : 'text-[#5B6B60]'}`}
+                >
+                  Semanal
+                </button>
+              </div>
+            </div>
+
             <Field
               label="Descripción"
               name="description"
@@ -1180,7 +1201,7 @@ export default function FinanzasPage() {
               name="next_date"
               type="date"
               defaultValue={editingRecurring?.next_date ?? today}
-              hint="Es solo una referencia. Puedes registrarlo antes o después."
+              hint={`Es solo una referencia. La próxima fecha se calculará automáticamente ${formFrequency === 'semanal' ? 'sumando 7 días' : 'al mes siguiente'}.`}
             />
           </div>
           <ModalActions

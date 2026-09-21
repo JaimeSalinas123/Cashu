@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Manrope } from 'next/font/google'
-import { getNutritionData, addFoodLog, deleteFoodLog, updateDailyBurned, deleteSavedFood } from './actions'
+import { getNutritionData, addFoodLog, updateFoodLog, deleteFoodLog, updateDailyBurned, deleteSavedFood } from './actions'
 
 const manrope = Manrope({ subsets: ['latin'], display: 'swap' })
 
@@ -13,6 +13,7 @@ const Icons = {
   ChevronRight: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>,
   Plus: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
   Trash: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+  Edit: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>,
   Apple: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"/><path d="M10 2c1 .5 2 2 2 5"/></svg>
 }
 
@@ -50,6 +51,7 @@ export default function ContadorCaloriasPage() {
   const [isBurnedModalOpen, setIsBurnedModalOpen] = useState(false)
   const [foodTab, setFoodTab] = useState<'nuevo' | 'frecuentes'>('nuevo')
   const [activeMealType, setActiveMealType] = useState('desayuno')
+  const [editingLog, setEditingLog] = useState<any>(null) // NUEVO: Estado para editar
 
   const loadData = async () => {
     setIsLoading(true)
@@ -65,10 +67,16 @@ export default function ContadorCaloriasPage() {
   const handlePrevDay = () => { const d = new Date(currentDate); d.setDate(d.getDate() - 1); setCurrentDate(d) }
   const handleNextDay = () => { const d = new Date(currentDate); d.setDate(d.getDate() + 1); setCurrentDate(d) }
 
-  const handleAddFood = async (formData: FormData) => {
+  const handleSaveFood = async (formData: FormData) => {
     setIsAddFoodModalOpen(false)
-    const res = await addFoodLog(formData)
-    if (res?.error) alert(`Error: ${res.error}`)
+    if (editingLog) {
+      const res = await updateFoodLog(formData)
+      if (res?.error) alert(`Error: ${res.error}`)
+    } else {
+      const res = await addFoodLog(formData)
+      if (res?.error) alert(`Error: ${res.error}`)
+    }
+    setEditingLog(null)
     await loadData()
   }
 
@@ -93,6 +101,18 @@ export default function ContadorCaloriasPage() {
     const res = await deleteSavedFood(formData)
     if (res?.error) alert(`Error: ${res.error}`)
     await loadData()
+  }
+
+  const openEditModal = (log: any, mealType: string) => {
+    setEditingLog(log)
+    setActiveMealType(mealType)
+    setFoodTab('nuevo') // Forzamos pestaña de formulario manual
+    setIsAddFoodModalOpen(true)
+  }
+
+  const closeFoodModal = () => {
+    setIsAddFoodModalOpen(false)
+    setEditingLog(null)
   }
 
   // CÁLCULOS MATEMÁTICOS GLOBALES
@@ -217,7 +237,6 @@ export default function ContadorCaloriasPage() {
         {/* LISTA DE COMIDAS POR SECCIÓN */}
         <div className="space-y-6">
           {MEAL_CATEGORIES.map(category => {
-            // Filtramos las comidas que pertenecen a esta categoría (si una vieja no tiene, la mandamos a merienda)
             const categoryLogs = logs.filter(l => (l.meal_type || 'merienda') === category.id)
             const catCals = categoryLogs.reduce((acc, curr) => acc + Number(curr.calories), 0)
 
@@ -242,9 +261,16 @@ export default function ContadorCaloriasPage() {
                             <span className="text-yellow-600 font-medium">G: {log.fat}g</span>
                           </p>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <span className="font-bold text-[#16211B]">{log.calories} kcal</span>
-                          <button onClick={() => handleDeleteLog(log.id)} className="text-[#A0B0A5] hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[#16211B] pr-2">{log.calories} kcal</span>
+                          
+                          {/* BOTÓN EDITAR */}
+                          <button onClick={() => openEditModal(log, category.id)} className="text-[#A0B0A5] hover:text-[#3FA66C] hover:bg-[#E3F3EA] p-2 rounded-lg transition-colors" title="Editar">
+                            {Icons.Edit}
+                          </button>
+                          
+                          {/* BOTÓN ELIMINAR */}
+                          <button onClick={() => handleDeleteLog(log.id)} className="text-[#A0B0A5] hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Eliminar">
                             {Icons.Trash}
                           </button>
                         </div>
@@ -307,58 +333,69 @@ export default function ContadorCaloriasPage() {
         </div>
       )}
 
-      {/* MODAL: AGREGAR ALIMENTO */}
+      {/* MODAL: AGREGAR O EDITAR ALIMENTO */}
       {isAddFoodModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#16211B]/30 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-[28px] bg-white p-7 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <h3 className="text-xl font-bold mb-1">Agregar a {MEAL_CATEGORIES.find(c => c.id === activeMealType)?.title}</h3>
-            <p className="text-sm text-[#5B6B60] mb-4">Añade lo que acabas de comer.</p>
+            <h3 className="text-xl font-bold mb-1">
+              {editingLog ? 'Editar Alimento' : `Agregar a ${MEAL_CATEGORIES.find(c => c.id === activeMealType)?.title}`}
+            </h3>
+            <p className="text-sm text-[#5B6B60] mb-4">
+              {editingLog ? 'Modifica las cantidades y vuelve a guardar.' : 'Añade lo que acabas de comer.'}
+            </p>
             
-            <div className="flex gap-1 bg-[#F5F9F6] p-1 rounded-xl mb-6 shrink-0">
-              <button onClick={() => setFoodTab('nuevo')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${foodTab === 'nuevo' ? 'bg-white shadow-sm text-[#16211B]' : 'text-[#5B6B60]'}`}>Crear Nuevo</button>
-              <button onClick={() => setFoodTab('frecuentes')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${foodTab === 'frecuentes' ? 'bg-white shadow-sm text-[#16211B]' : 'text-[#5B6B60]'}`}>Mis Comidas</button>
-            </div>
+            {!editingLog && (
+              <div className="flex gap-1 bg-[#F5F9F6] p-1 rounded-xl mb-6 shrink-0">
+                <button onClick={() => setFoodTab('nuevo')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${foodTab === 'nuevo' ? 'bg-white shadow-sm text-[#16211B]' : 'text-[#5B6B60]'}`}>Crear Nuevo</button>
+                <button onClick={() => setFoodTab('frecuentes')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${foodTab === 'frecuentes' ? 'bg-white shadow-sm text-[#16211B]' : 'text-[#5B6B60]'}`}>Mis Comidas</button>
+              </div>
+            )}
 
             <div className="overflow-y-auto flex-1 pr-2">
               {foodTab === 'nuevo' ? (
-                <form action={handleAddFood} className="flex flex-col h-full">
+                <form action={handleSaveFood} className="flex flex-col h-full">
                   <input type="hidden" name="date_id" value={dateId} />
                   <input type="hidden" name="meal_type" value={activeMealType} />
+                  {editingLog && <input type="hidden" name="id" value={editingLog.id} />}
                   
                   <div className="space-y-4 mb-6">
                     <div>
                       <label className="block text-sm font-medium text-[#33443A] mb-1.5">Nombre del alimento / receta</label>
-                      <input type="text" name="name" required placeholder="Ej: Pan con huevo (2 rebanadas)" className="w-full rounded-xl border border-[#DCE8DF] bg-[#F5F9F6] p-3 outline-none focus:border-[#3FA66C]" />
+                      <input type="text" name="name" required defaultValue={editingLog?.name} placeholder="Ej: Pan con huevo (2 rebanadas)" className="w-full rounded-xl border border-[#DCE8DF] bg-[#F5F9F6] p-3 outline-none focus:border-[#3FA66C]" />
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-[#33443A] mb-1.5">Calorías (kcal)</label>
-                        <input type="number" name="calories" required step="0.1" placeholder="0" className="w-full rounded-xl border border-[#DCE8DF] bg-[#F5F9F6] p-3 outline-none focus:border-[#3FA66C] font-bold" />
+                        <input type="number" name="calories" required step="0.1" defaultValue={editingLog?.calories} placeholder="0" className="w-full rounded-xl border border-[#DCE8DF] bg-[#F5F9F6] p-3 outline-none focus:border-[#3FA66C] font-bold" />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-blue-600 mb-1.5">Proteína (g)</label>
-                        <input type="number" name="protein" step="0.1" placeholder="0" className="w-full rounded-xl border border-[#DCE8DF] bg-[#F5F9F6] p-3 outline-none focus:border-blue-400" />
+                        <input type="number" name="protein" step="0.1" defaultValue={editingLog?.protein} placeholder="0" className="w-full rounded-xl border border-[#DCE8DF] bg-[#F5F9F6] p-3 outline-none focus:border-blue-400" />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-orange-500 mb-1.5">Carbs (g)</label>
-                        <input type="number" name="carbs" step="0.1" placeholder="0" className="w-full rounded-xl border border-[#DCE8DF] bg-[#F5F9F6] p-3 outline-none focus:border-orange-400" />
+                        <input type="number" name="carbs" step="0.1" defaultValue={editingLog?.carbs} placeholder="0" className="w-full rounded-xl border border-[#DCE8DF] bg-[#F5F9F6] p-3 outline-none focus:border-orange-400" />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-yellow-600 mb-1.5">Grasa (g)</label>
-                        <input type="number" name="fat" step="0.1" placeholder="0" className="w-full rounded-xl border border-[#DCE8DF] bg-[#F5F9F6] p-3 outline-none focus:border-yellow-400" />
+                        <input type="number" name="fat" step="0.1" defaultValue={editingLog?.fat} placeholder="0" className="w-full rounded-xl border border-[#DCE8DF] bg-[#F5F9F6] p-3 outline-none focus:border-yellow-400" />
                       </div>
                     </div>
 
-                    <label className="flex items-center gap-3 mt-4 p-3 border border-[#DCE8DF] rounded-xl cursor-pointer hover:bg-[#F5F9F6] transition-colors">
-                      <input type="checkbox" name="save_frequent" className="w-5 h-5 accent-[#3FA66C]" />
-                      <span className="text-sm font-medium">Guardar en "Mis Comidas" para usarlo después</span>
-                    </label>
+                    {!editingLog && (
+                      <label className="flex items-center gap-3 mt-4 p-3 border border-[#DCE8DF] rounded-xl cursor-pointer hover:bg-[#F5F9F6] transition-colors">
+                        <input type="checkbox" name="save_frequent" className="w-5 h-5 accent-[#3FA66C]" />
+                        <span className="text-sm font-medium">Guardar en "Mis Comidas" para usarlo después</span>
+                      </label>
+                    )}
                   </div>
 
                   <div className="flex gap-3 mt-auto pt-4 border-t border-[#DCE8DF]">
-                    <button type="button" onClick={() => setIsAddFoodModalOpen(false)} className="flex-1 rounded-xl border border-[#DCE8DF] bg-white py-3 text-sm font-semibold hover:bg-[#F5F9F6]">Cancelar</button>
-                    <button type="submit" className="flex-1 rounded-xl bg-[#3FA66C] py-3 text-sm font-semibold text-white hover:bg-[#2b754b]">Agregar a hoy</button>
+                    <button type="button" onClick={closeFoodModal} className="flex-1 rounded-xl border border-[#DCE8DF] bg-white py-3 text-sm font-semibold hover:bg-[#F5F9F6]">Cancelar</button>
+                    <button type="submit" className="flex-1 rounded-xl bg-[#3FA66C] py-3 text-sm font-semibold text-white hover:bg-[#2b754b]">
+                      {editingLog ? 'Actualizar' : 'Agregar a hoy'}
+                    </button>
                   </div>
                 </form>
               ) : (
@@ -374,13 +411,11 @@ export default function ContadorCaloriasPage() {
                             <p className="text-xs text-[#5B6B60] mt-0.5">{food.calories} kcal • P:{food.protein} C:{food.carbs} G:{food.fat}</p>
                           </div>
                           <div className="flex gap-2">
-                            {/* BOTÓN BASURERO (Elimina de frecuentes) */}
                             <button type="button" onClick={() => handleDeleteSaved(food.id)} className="text-[#A0B0A5] hover:text-red-500 bg-white border border-[#DCE8DF] p-2 rounded-lg transition-colors">
                               {Icons.Trash}
                             </button>
                             
-                            {/* BOTÓN AGREGAR (Añade a tu registro del día en la categoría activa) */}
-                            <form action={handleAddFood}>
+                            <form action={handleSaveFood}>
                               <input type="hidden" name="date_id" value={dateId} />
                               <input type="hidden" name="meal_type" value={activeMealType} />
                               <input type="hidden" name="name" value={food.name} />
@@ -398,7 +433,7 @@ export default function ContadorCaloriasPage() {
                     </div>
                   )}
                   <div className="mt-auto pt-4 border-t border-[#DCE8DF]">
-                    <button type="button" onClick={() => setIsAddFoodModalOpen(false)} className="w-full rounded-xl border border-[#DCE8DF] bg-white py-3 text-sm font-semibold hover:bg-[#F5F9F6]">Cerrar</button>
+                    <button type="button" onClick={closeFoodModal} className="w-full rounded-xl border border-[#DCE8DF] bg-white py-3 text-sm font-semibold hover:bg-[#F5F9F6]">Cerrar</button>
                   </div>
                 </div>
               )}
